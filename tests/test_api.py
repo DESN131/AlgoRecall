@@ -182,6 +182,9 @@ def test_web_review_form_accepts_historical_date(client):
     page = client.get(f"/review?problem_id={problem['id']}")
     assert 'name="reviewed_on"' in page.text
     assert f'min="{solved_on.isoformat()}"' in page.text
+    assert 'type="button" data-rating="RED"' in page.text
+    assert 'id="submit-review" disabled' in page.text
+    assert "提交复习" in page.text
     response = client.post(
         f"/review/{problem['id']}",
         data={

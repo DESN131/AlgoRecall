@@ -2,6 +2,29 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
+.rate.selected {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(23, 107, 75, .12);
+  transform: translateY(-2px);
+}
+
+.rate.red.selected { background: #fff1f0; border-color: #c9504a; }
+.rate.yellow.selected { background: #fff8df; border-color: #d4a128; }
+.rate.green.selected { background: #eaf8f0; border-color: #339d6e; }
+
+.review-submit {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.review-submit span { color: var(--muted); font-size: 13px; }
+.review-submit button:disabled { cursor: not-allowed; opacity: .5; }
+
 @media (max-width: 850px) {
   .review-fields {
     grid-template-columns: 1fr;
