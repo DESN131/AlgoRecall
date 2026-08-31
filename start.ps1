@@ -4,6 +4,7 @@ param(
     [ValidateRange(1, 65535)]
     [int]$Port = 8000,
     [switch]$NoReload,
+    [switch]$NoBrowser,
     [switch]$SkipInstall
 )
 
@@ -75,13 +76,34 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectRoot "data"))) {
 }
 
 $reloadDescription = if ($NoReload) { "disabled" } else { "enabled" }
+$browserHost = if ($BindHost -in @("0.0.0.0", "::", "[::]")) { "127.0.0.1" } else { $BindHost }
+$appUrl = "http://${browserHost}:$Port/"
 Write-Host ""
 Write-Host "[AlgoRecall] Starting..." -ForegroundColor Green
 Write-Host "[AlgoRecall] Python: $venvPython"
-Write-Host "[AlgoRecall] URL: http://${BindHost}:$Port"
+Write-Host "[AlgoRecall] URL: $appUrl"
 Write-Host "[AlgoRecall] Auto reload: $reloadDescription"
+Write-Host "[AlgoRecall] Open browser: $(if ($NoBrowser) { 'disabled' } else { 'enabled' })"
 Write-Host "[AlgoRecall] Press Ctrl+C to stop."
 Write-Host ""
+
+if (-not $NoBrowser) {
+    $browserJob = Start-Job -ScriptBlock {
+        param([string]$Url)
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            try {
+                $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 1
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+                    Start-Process $Url
+                    return
+                }
+            }
+            catch {
+                Start-Sleep -Milliseconds 500
+            }
+        }
+    } -ArgumentList $appUrl
+}
 
 $uvicornArguments = @(
     "-m", "uvicorn",
@@ -94,4 +116,9 @@ if (-not $NoReload) {
 }
 
 & $venvPython @uvicornArguments
-exit $LASTEXITCODE
+$serverExitCode = $LASTEXITCODE
+if ($browserJob) {
+    Stop-Job -Job $browserJob -ErrorAction SilentlyContinue
+    Remove-Job -Job $browserJob -Force -ErrorAction SilentlyContinue
+}
+exit $serverExitCode

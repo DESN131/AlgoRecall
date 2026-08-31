@@ -15,10 +15,16 @@ Windows 可以直接双击 `start.bat`，或在 PowerShell 中运行：
 .\start.ps1
 ```
 
-脚本默认使用项目目录中的 `.venv`。如果虚拟环境不存在，会自动创建并安装运行依赖，然后启动开发服务器。可选参数：
+脚本默认使用项目目录中的 `.venv`。如果虚拟环境不存在，会自动创建并安装运行依赖；服务就绪后会用系统默认浏览器打开首页。可选参数：
 
 ```powershell
 .\start.ps1 -BindHost 0.0.0.0 -Port 8080 -NoReload
+```
+
+如果不希望自动打开浏览器：
+
+```powershell
+.\start.ps1 -NoBrowser
 ```
 
 也可以手动启动：
