@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.timezone import local_today
+from app.core.timezone import local_today, utc_naive_to_local_date
 from app.models import AppSettings, Problem, ReviewRecord, Tag
 from app.models.enums import Difficulty, Rating, ReviewStage
 from app.services.problem_service import list_problems
@@ -158,18 +158,22 @@ def review_page(request: Request, db: Db, problem_id: int | None = None, complet
     due_stmt = select(Problem).where(Problem.is_archived.is_(False), Problem.next_review_at <= today, Problem.review_stage != ReviewStage.MASTERED).order_by(Problem.next_review_at)
     queue = list(db.scalars(due_stmt).unique())
     problem = db.get(Problem, problem_id) if problem_id else (queue[0] if queue else None)
-    return templates.TemplateResponse(request, "review/index.html", base_context(request, db, problem=problem, queue=queue, completed=completed, red=red, yellow=yellow, green=green))
+    last_review_date = utc_naive_to_local_date(problem.last_reviewed_at) if problem and problem.last_reviewed_at else today
+    return templates.TemplateResponse(request, "review/index.html", base_context(request, db, problem=problem, queue=queue, completed=completed, red=red, yellow=yellow, green=green, last_review_date=last_review_date))
 
 
 @router.post("/review/{problem_id}")
-def complete_review(problem_id: int, db: Db, rating: Annotated[Rating, Form()], duration_minutes: Annotated[str, Form()] = "", used_hint: Annotated[bool, Form()] = False, viewed_solution: Annotated[bool, Form()] = False, note: Annotated[str, Form()] = "", completed: Annotated[int, Form()] = 0, red: Annotated[int, Form()] = 0, yellow: Annotated[int, Form()] = 0, green: Annotated[int, Form()] = 0):
+def complete_review(problem_id: int, db: Db, rating: Annotated[Rating, Form()], reviewed_on: Annotated[date, Form()], duration_minutes: Annotated[str, Form()] = "", used_hint: Annotated[bool, Form()] = False, viewed_solution: Annotated[bool, Form()] = False, note: Annotated[str, Form()] = "", completed: Annotated[int, Form()] = 0, red: Annotated[int, Form()] = 0, yellow: Annotated[int, Form()] = 0, green: Annotated[int, Form()] = 0):
     problem = db.get(Problem, problem_id)
     if not problem or problem.is_archived:
         raise HTTPException(404)
+    last_review_date = utc_naive_to_local_date(problem.last_reviewed_at) if problem.last_reviewed_at else reviewed_on
+    if reviewed_on < last_review_date or reviewed_on > local_today():
+        raise HTTPException(422, "复习日期必须介于最后复习日期和今天之间")
     duration = int(duration_minutes) if duration_minutes.strip() else None
     if duration is not None and not 0 <= duration <= 600:
         raise HTTPException(422, "耗时须在 0–600 分钟之间")
-    record_review(db, problem, rating, duration_minutes=duration, used_hint=used_hint, viewed_solution=viewed_solution, note=note)
+    record_review(db, problem, rating, review_date=reviewed_on, duration_minutes=duration, used_hint=used_hint, viewed_solution=viewed_solution, note=note)
     db.commit()
     counts = {"red": red, "yellow": yellow, "green": green}
     counts[rating.value.lower()] += 1

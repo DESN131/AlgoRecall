@@ -4,6 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% if due_count %}({{ due_count }}) {% endif %}{% block title %}AlgoRecall{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/review-date.css') }}">
 </head>
 <body>
   <header class="topbar">
@@ -20,4 +21,3 @@
   <footer>AlgoRecall · 数据保存在本机 · <a href="/docs">API 文档</a></footer>
   {% block scripts %}{% endblock %}
 </body></html>
-

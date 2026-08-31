@@ -45,8 +45,13 @@ def record_review(
     viewed_solution: bool = False,
     note: str | None = None,
 ) -> ReviewRecord:
-    reviewed_at = reviewed_at or utc_now()
-    effective_review_date = review_date or local_today()
+    effective_review_date = review_date or (reviewed_at.date() if reviewed_at else local_today())
+    if reviewed_at is None:
+        reviewed_at = (
+            utc_now()
+            if effective_review_date == local_today()
+            else datetime.combine(effective_review_date, time(hour=12))
+        )
     schedule = calculate_next_review(problem.review_stage, rating, effective_review_date)
     record = ReviewRecord(
         problem=problem,
@@ -79,10 +84,6 @@ def create_initial_review(
     review_date: date | None = None,
     reviewed_at: datetime | None = None,
 ) -> ReviewRecord:
-    if reviewed_at is None and review_date is not None:
-        # The exact time of a historical solve is unknown. Noon UTC preserves
-        # the selected calendar date while keeping the stored datetime in UTC.
-        reviewed_at = datetime.combine(review_date, time(hour=12))
     problem.review_stage = None  # type: ignore[assignment]
     problem.review_count = 0
     return record_review(db, problem, rating, reviewed_at=reviewed_at, review_date=review_date)

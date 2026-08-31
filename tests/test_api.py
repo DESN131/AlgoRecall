@@ -99,6 +99,45 @@ def test_create_problem_rejects_future_solved_date(client):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_submit_historical_reviews_in_date_order(client):
+    solved_on = date.today() - timedelta(days=30)
+    problem = create_problem(client, rating="RED", solved_on=solved_on.isoformat()).json()
+    first_review_date = solved_on + timedelta(days=1)
+    reviewed = client.post(
+        f"/api/v1/problems/{problem['id']}/reviews",
+        json={"rating": "YELLOW", "reviewed_on": first_review_date.isoformat()},
+    )
+    assert reviewed.status_code == 201
+    assert reviewed.json()["reviewed_at"].startswith(first_review_date.isoformat())
+    assert reviewed.json()["next_review_at"] == (first_review_date + timedelta(days=3)).isoformat()
+
+    second_review_date = first_review_date + timedelta(days=3)
+    reviewed_again = client.post(
+        f"/api/v1/problems/{problem['id']}/reviews",
+        json={"rating": "YELLOW", "reviewed_on": second_review_date.isoformat()},
+    )
+    assert reviewed_again.status_code == 201
+    assert reviewed_again.json()["stage_after"] == "YELLOW_D7"
+    assert reviewed_again.json()["next_review_at"] == (second_review_date + timedelta(days=7)).isoformat()
+
+    out_of_order = client.post(
+        f"/api/v1/problems/{problem['id']}/reviews",
+        json={"rating": "RED", "reviewed_on": first_review_date.isoformat()},
+    )
+    assert out_of_order.status_code == 422
+    assert out_of_order.json()["error"]["code"] == "REVIEW_DATE_OUT_OF_ORDER"
+
+
+def test_submit_review_rejects_future_date(client):
+    problem = create_problem(client).json()
+    response = client.post(
+        f"/api/v1/problems/{problem['id']}/reviews",
+        json={"rating": "GREEN", "reviewed_on": (date.today() + timedelta(days=1)).isoformat()},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_statistics(client):
     create_problem(client, 128, "RED")
     create_problem(client, 1, "GREEN")
@@ -135,3 +174,24 @@ def test_web_form_creates_historical_problem(client):
     assert response.status_code == 303
     problem = client.get("/api/v1/problems", params={"search": "200"}).json()["items"][0]
     assert problem["next_review_at"] == (solved_on + timedelta(days=7)).isoformat()
+
+
+def test_web_review_form_accepts_historical_date(client):
+    solved_on = date.today() - timedelta(days=10)
+    problem = create_problem(client, solved_on=solved_on.isoformat()).json()
+    page = client.get(f"/review?problem_id={problem['id']}")
+    assert 'name="reviewed_on"' in page.text
+    assert f'min="{solved_on.isoformat()}"' in page.text
+    response = client.post(
+        f"/review/{problem['id']}",
+        data={
+            "rating": "GREEN",
+            "reviewed_on": (solved_on + timedelta(days=1)).isoformat(),
+            "duration_minutes": "18",
+            "note": "历史复习记录",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    current = client.get(f"/api/v1/problems/{problem['id']}").json()
+    assert current["next_review_at"] == (solved_on + timedelta(days=8)).isoformat()

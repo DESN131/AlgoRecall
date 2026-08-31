@@ -4,7 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.api.v1.problems import get_problem_or_404
 from app.core.database import get_db
-from app.core.timezone import local_today
+from app.core.timezone import local_today, utc_naive_to_local_date
+from app.api.errors import api_error
 from app.models import Problem, ReviewRecord
 from app.models.enums import ReviewStage
 from app.schemas.problem import ProblemRead
@@ -24,7 +25,9 @@ def due_reviews(db: Db, limit: int = Query(100, ge=1, le=500)):
 @router.post("/problems/{problem_id}/reviews", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)
 def submit_review(problem_id: int, payload: ReviewCreate, db: Db):
     problem = get_problem_or_404(db, problem_id)
-    record = record_review(db, problem, payload.rating, duration_minutes=payload.duration_minutes, used_hint=payload.used_hint, viewed_solution=payload.viewed_solution, note=payload.note)
+    if problem.last_reviewed_at and payload.reviewed_on < utc_naive_to_local_date(problem.last_reviewed_at):
+        raise api_error(422, "REVIEW_DATE_OUT_OF_ORDER", "Review date cannot be earlier than the latest review date.")
+    record = record_review(db, problem, payload.rating, review_date=payload.reviewed_on, duration_minutes=payload.duration_minutes, used_hint=payload.used_hint, viewed_solution=payload.viewed_solution, note=payload.note)
     db.commit()
     db.refresh(record)
     return record
@@ -43,4 +46,3 @@ def schedule_review(problem_id: int, payload: ScheduleCreate, db: Db):
     db.commit()
     db.refresh(problem)
     return problem
-

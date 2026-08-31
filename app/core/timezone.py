@@ -11,3 +11,7 @@ def utc_now() -> datetime:
 def local_today() -> date:
     return datetime.now(ZoneInfo(get_settings().app_timezone)).date()
 
+
+def utc_naive_to_local_date(value: datetime) -> date:
+    """Convert a UTC-naive database datetime to its application-local date."""
+    return value.replace(tzinfo=UTC).astimezone(ZoneInfo(get_settings().app_timezone)).date()
