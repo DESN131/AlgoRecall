@@ -15,7 +15,7 @@ Windows 可以直接双击 `start.bat`，或在 PowerShell 中运行：
 .\start.ps1
 ```
 
-脚本会检查 Python 版本、按需安装依赖并启动开发服务器。可选参数：
+脚本默认使用项目目录中的 `.venv`。如果虚拟环境不存在，会自动创建并安装运行依赖，然后启动开发服务器。可选参数：
 
 ```powershell
 .\start.ps1 -BindHost 0.0.0.0 -Port 8080 -NoReload
@@ -24,8 +24,9 @@ Windows 可以直接双击 `start.bat`，或在 PowerShell 中运行：
 也可以手动启动：
 
 ```powershell
-python -m pip install -e ".[test]"
-uvicorn app.main:app --reload
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
 访问 <http://127.0.0.1:8000>。首次启动会自动运行 Alembic 迁移并创建数据库。API 文档位于 <http://127.0.0.1:8000/docs>。

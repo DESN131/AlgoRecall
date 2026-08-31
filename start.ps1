@@ -17,14 +17,38 @@ function Stop-WithMessage {
     exit 1
 }
 
-$pythonCommand = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCommand) {
-    Stop-WithMessage "Python was not found. Install Python 3.12+ and add it to PATH."
+$venvDirectory = Join-Path $projectRoot ".venv"
+$venvPython = Join-Path $venvDirectory "Scripts\python.exe"
+
+if (-not (Test-Path -LiteralPath $venvPython)) {
+    $systemPython = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $systemPython) {
+        Stop-WithMessage "Python was not found. Install Python 3.12+ and add it to PATH."
+    }
+
+    $systemVersion = & python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+    if ($LASTEXITCODE -ne 0) {
+        Stop-WithMessage "Python could not be executed."
+    }
+
+    $systemVersionParts = $systemVersion.Trim().Split('.')
+    $systemPythonSupported = ([int]$systemVersionParts[0] -gt 3) -or (
+        ([int]$systemVersionParts[0] -eq 3) -and ([int]$systemVersionParts[1] -ge 12)
+    )
+    if (-not $systemPythonSupported) {
+        Stop-WithMessage "Python $systemVersion is installed, but Python 3.12+ is required."
+    }
+
+    Write-Host "[AlgoRecall] Creating virtual environment in .venv..." -ForegroundColor Yellow
+    & python -m venv $venvDirectory
+    if (($LASTEXITCODE -ne 0) -or (-not (Test-Path -LiteralPath $venvPython))) {
+        Stop-WithMessage "Virtual environment creation failed."
+    }
 }
 
-$versionText = & python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+$versionText = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
 if ($LASTEXITCODE -ne 0) {
-    Stop-WithMessage "Python could not be executed."
+    Stop-WithMessage "The .venv Python interpreter could not be executed. Recreate .venv."
 }
 
 $versionParts = $versionText.Trim().Split('.')
@@ -32,14 +56,14 @@ $pythonSupported = ([int]$versionParts[0] -gt 3) -or (
     ([int]$versionParts[0] -eq 3) -and ([int]$versionParts[1] -ge 12)
 )
 if (-not $pythonSupported) {
-    Stop-WithMessage "Python $versionText is installed, but Python 3.12+ is required."
+    Stop-WithMessage "The .venv uses Python $versionText, but Python 3.12+ is required."
 }
 
 if (-not $SkipInstall) {
-    & python -c "import fastapi, sqlalchemy, alembic, jinja2, uvicorn" 2>$null
+    & $venvPython -c "import fastapi, sqlalchemy, alembic, jinja2, uvicorn, pydantic_settings, multipart, tzdata" 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[AlgoRecall] Installing missing runtime dependencies..." -ForegroundColor Yellow
-        & python -m pip install -e .
+        & $venvPython -m pip install -e .
         if ($LASTEXITCODE -ne 0) {
             Stop-WithMessage "Dependency installation failed. Check the network and Python environment."
         }
@@ -53,6 +77,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectRoot "data"))) {
 $reloadDescription = if ($NoReload) { "disabled" } else { "enabled" }
 Write-Host ""
 Write-Host "[AlgoRecall] Starting..." -ForegroundColor Green
+Write-Host "[AlgoRecall] Python: $venvPython"
 Write-Host "[AlgoRecall] URL: http://${BindHost}:$Port"
 Write-Host "[AlgoRecall] Auto reload: $reloadDescription"
 Write-Host "[AlgoRecall] Press Ctrl+C to stop."
@@ -68,5 +93,5 @@ if (-not $NoReload) {
     $uvicornArguments += "--reload"
 }
 
-& python @uvicornArguments
+& $venvPython @uvicornArguments
 exit $LASTEXITCODE
