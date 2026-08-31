@@ -1,0 +1,2 @@
+"""AlgoRecall application package."""
+

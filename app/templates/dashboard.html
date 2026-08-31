@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}首页 · AlgoRecall{% endblock %}
+{% block content %}
+<section class="hero"><div><p class="eyebrow">{{ today.strftime('%Y 年 %m 月 %d 日') }}</p><h1>今天，巩固真正重要的题。</h1><p>用间隔复习把“做过”变成“掌握”。</p></div><a class="btn primary large" href="/review">开始今日复习 <span>{{ stats.due_today }}</span></a></section>
+<section class="stats-grid">
+  <a class="stat" href="/problems"><span>全部题目</span><strong>{{ stats.total }}</strong></a>
+  <a class="stat red" href="/problems?rating=RED"><span>🔴 Red</span><strong>{{ stats.red }}</strong></a>
+  <a class="stat yellow" href="/problems?rating=YELLOW"><span>🟡 Yellow</span><strong>{{ stats.yellow }}</strong></a>
+  <a class="stat green" href="/problems?rating=GREEN"><span>🟢 Green</span><strong>{{ stats.green }}</strong></a>
+  <a class="stat mastered" href="/problems?rating=MASTERED"><span>✅ 已掌握</span><strong>{{ stats.mastered }}</strong></a>
+</section>
+<div class="two-col">
+  <section class="card"><div class="card-head"><div><p class="eyebrow">优先处理</p><h2>今日待复习</h2></div><a href="/review">查看队列 →</a></div>
+  {% if due %}<div class="problem-stack">{% for p in due %}<a href="/review?problem_id={{ p.id }}"><span class="rating-dot {{ p.rating.value|lower }}">{{ '🔴' if p.rating.value == 'RED' else '🟡' if p.rating.value == 'YELLOW' else '🟢' }}</span><b>#{{ p.leetcode_id }} {{ p.title }}</b><small>{{ p.next_review_at }} · {{ p.review_stage.value }}</small></a>{% endfor %}</div>{% else %}<div class="empty"><span>🎉</span><h3>今天已清空</h3><p>没有到期题目，去添加一道新题吧。</p></div>{% endif %}</section>
+  <section class="card"><div class="card-head"><div><p class="eyebrow">未来 7 天</p><h2>即将复习</h2></div></div><div class="upcoming">{% for day, count in upcoming %}<div><span>{{ day.strftime('%m/%d') }}</span><div class="bar"><i style="width:{{ [count * 14, 4]|max }}%"></i></div><strong>{{ count }}</strong></div>{% endfor %}</div></section>
+</div>
+<section class="quick"><a class="btn primary" href="/problems/new">＋ 添加题目</a><a class="btn" href="/problems">查看全部题目</a><a class="btn" href="/statistics">学习统计</a></section>
+{% endblock %}
+

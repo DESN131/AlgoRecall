@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% if due_count %}({{ due_count }}) {% endif %}{% block title %}AlgoRecall{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">A</span><span>AlgoRecall<small>算法错题复习</small></span></a>
+    <nav>
+      <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">首页</a>
+      <a href="/problems" class="{% if request.url.path.startswith('/problems') %}active{% endif %}">题库</a>
+      <a href="/review" class="{% if request.url.path == '/review' %}active{% endif %}">今日复习{% if due_count %}<b>{{ due_count }}</b>{% endif %}</a>
+      <a href="/history">历史</a><a href="/statistics">统计</a><a href="/settings">设置</a>
+    </nav>
+  </header>
+  {% if due_count %}<a class="notice" href="/review">🔔 今天有 {{ due_count }} 道题需要复习 <span>立即开始 →</span></a>{% endif %}
+  <main class="container">{% block content %}{% endblock %}</main>
+  <footer>AlgoRecall · 数据保存在本机 · <a href="/docs">API 文档</a></footer>
+  {% block scripts %}{% endblock %}
+</body></html>
+

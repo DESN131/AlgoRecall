@@ -3,7 +3,7 @@ from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.timezone import utc_now
+from app.core.timezone import local_today, utc_now
 from app.models import Problem, ReviewRecord
 from app.models.enums import Rating, ReviewStage
 
@@ -44,8 +44,10 @@ def record_review(
     viewed_solution: bool = False,
     note: str | None = None,
 ) -> ReviewRecord:
+    explicit_reviewed_at = reviewed_at
     reviewed_at = reviewed_at or utc_now()
-    schedule = calculate_next_review(problem.review_stage, rating, reviewed_at.date())
+    review_date = explicit_reviewed_at.date() if explicit_reviewed_at else local_today()
+    schedule = calculate_next_review(problem.review_stage, rating, review_date)
     record = ReviewRecord(
         problem=problem,
         reviewed_at=reviewed_at,
@@ -73,4 +75,3 @@ def create_initial_review(db: Session, problem: Problem, rating: Rating, reviewe
     problem.review_stage = None  # type: ignore[assignment]
     problem.review_count = 0
     return record_review(db, problem, rating, reviewed_at=reviewed_at)
-
