@@ -88,7 +88,10 @@ async def create_problem_page(request: Request, db: Db):
             code=str(form.get("code", "")).rstrip() or None, tags=get_or_create_tags(db, str(form.get("tags", ""))),
         )
         db.add(problem)
-        create_initial_review(db, problem, problem.rating)
+        solved_on = date.fromisoformat(str(form.get("solved_on", local_today().isoformat())))
+        if solved_on > local_today():
+            raise ValueError
+        create_initial_review(db, problem, problem.rating, review_date=solved_on)
         db.commit()
         return RedirectResponse(f"/problems/{problem.id}", status_code=303)
     except (ValueError, IntegrityError):

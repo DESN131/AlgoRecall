@@ -41,7 +41,13 @@ def create_app(*, migrate: bool = True) -> FastAPI:
     @application.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         if request.url.path.startswith("/api/"):
-            return JSONResponse(status_code=422, content={"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed.", "details": exc.errors()}})
+            details = []
+            for item in exc.errors():
+                error = dict(item)
+                if "ctx" in error:
+                    error["ctx"] = {key: str(value) for key, value in error["ctx"].items()}
+                details.append(error)
+            return JSONResponse(status_code=422, content={"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed.", "details": details}})
         return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
     return application

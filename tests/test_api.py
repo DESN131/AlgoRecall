@@ -1,8 +1,8 @@
 from datetime import date, timedelta
 
 
-def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None):
-    return client.post("/api/v1/problems", json={
+def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None, solved_on=None):
+    payload = {
         "leetcode_id": leetcode_id,
         "title": "最长连续序列",
         "title_en": "Longest Consecutive Sequence",
@@ -12,7 +12,10 @@ def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None):
         "tag_ids": tag_ids or [],
         "mistake_reason": "没有想到 set",
         "correct_solution": "从序列起点开始枚举",
-    })
+    }
+    if solved_on is not None:
+        payload["solved_on"] = solved_on
+    return client.post("/api/v1/problems", json=payload)
 
 
 def test_problem_crud_and_duplicate(client):
@@ -78,6 +81,24 @@ def test_review_submission_due_history_and_schedule(client):
     assert len(client.get(f"/api/v1/problems/{problem_id}/reviews").json()) == 2
 
 
+def test_create_problem_with_past_solved_date(client):
+    solved_on = date.today() - timedelta(days=10)
+    response = create_problem(client, solved_on=solved_on.isoformat())
+    assert response.status_code == 201
+    problem = response.json()
+    assert problem["next_review_at"] == (solved_on + timedelta(days=1)).isoformat()
+    assert len(client.get("/api/v1/reviews/due").json()) == 1
+    history = client.get(f"/api/v1/problems/{problem['id']}/reviews").json()
+    assert history[0]["reviewed_at"].startswith(solved_on.isoformat())
+    assert history[0]["next_review_at"] == (solved_on + timedelta(days=1)).isoformat()
+
+
+def test_create_problem_rejects_future_solved_date(client):
+    response = create_problem(client, solved_on=(date.today() + timedelta(days=1)).isoformat())
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_statistics(client):
     create_problem(client, 128, "RED")
     create_problem(client, 1, "GREEN")
@@ -94,3 +115,23 @@ def test_web_pages_smoke(client):
         response = client.get(path)
         assert response.status_code == 200, path
 
+
+def test_web_form_creates_historical_problem(client):
+    solved_on = date.today() - timedelta(days=20)
+    form = client.get("/problems/new")
+    assert f'value="{date.today().isoformat()}"' in form.text
+    response = client.post(
+        "/problems/new",
+        data={
+            "leetcode_id": "200",
+            "title": "岛屿数量",
+            "difficulty": "MEDIUM",
+            "initial_rating": "GREEN",
+            "solved_on": solved_on.isoformat(),
+            "tags": "图, DFS",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    problem = client.get("/api/v1/problems", params={"search": "200"}).json()["items"][0]
+    assert problem["next_review_at"] == (solved_on + timedelta(days=7)).isoformat()

@@ -1,8 +1,9 @@
 from datetime import date, datetime
 from typing import Annotated
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from app.models.enums import Difficulty, Rating, ReviewStage
 from app.schemas.tag import TagRead
+from app.core.timezone import local_today
 
 
 class ProblemCreate(BaseModel):
@@ -12,6 +13,7 @@ class ProblemCreate(BaseModel):
     leetcode_url: HttpUrl | None = None
     difficulty: Difficulty = Difficulty.UNKNOWN
     initial_rating: Rating
+    solved_on: date = Field(default_factory=local_today)
     tag_ids: list[int] = []
     mistake_reason: str | None = None
     my_solution: str | None = None
@@ -20,6 +22,13 @@ class ProblemCreate(BaseModel):
     time_complexity: str | None = Field(default=None, max_length=100)
     space_complexity: str | None = Field(default=None, max_length=100)
     code: str | None = None
+
+    @field_validator("solved_on")
+    @classmethod
+    def solved_on_cannot_be_in_future(cls, value: date) -> date:
+        if value > local_today():
+            raise ValueError("solved_on cannot be in the future")
+        return value
 
 
 class ProblemUpdate(BaseModel):
@@ -67,4 +76,3 @@ class ProblemList(BaseModel):
     total: int
     page: int
     page_size: int
-

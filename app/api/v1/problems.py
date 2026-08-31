@@ -42,12 +42,12 @@ def get_problems(db: Db, rating: str | None = None, difficulty: Difficulty | Non
 def create_problem(payload: ProblemCreate, db: Db):
     if db.scalar(select(Problem.id).where(Problem.leetcode_id == payload.leetcode_id)):
         raise api_error(409, "PROBLEM_ALREADY_EXISTS", f"LeetCode problem #{payload.leetcode_id} already exists.")
-    data = payload.model_dump(exclude={"initial_rating", "tag_ids"})
+    data = payload.model_dump(exclude={"initial_rating", "tag_ids", "solved_on"})
     if data.get("leetcode_url") is not None:
         data["leetcode_url"] = str(data["leetcode_url"])
     problem = Problem(**data, rating=payload.initial_rating, review_stage="RED_D1", tags=resolve_tags(db, payload.tag_ids))
     db.add(problem)
-    create_initial_review(db, problem, payload.initial_rating)
+    create_initial_review(db, problem, payload.initial_rating, review_date=payload.solved_on)
     try:
         db.commit()
     except IntegrityError:
@@ -83,4 +83,3 @@ def delete_problem(problem_id: int, db: Db):
     problem.is_archived = True
     db.commit()
     return Response(status_code=204)
-
