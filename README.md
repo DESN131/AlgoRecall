@@ -9,6 +9,20 @@
 
 ## 安装与启动
 
+Windows 可以直接双击 `start.bat`，或在 PowerShell 中运行：
+
+```powershell
+.\start.ps1
+```
+
+脚本会检查 Python 版本、按需安装依赖并启动开发服务器。可选参数：
+
+```powershell
+.\start.ps1 -BindHost 0.0.0.0 -Port 8080 -NoReload
+```
+
+也可以手动启动：
+
 ```powershell
 python -m pip install -e ".[test]"
 uvicorn app.main:app --reload
@@ -39,4 +53,3 @@ python -m pytest
 - `/history`：全局复习历史
 - `/statistics`：学习统计
 - `/api/v1`：REST API 前缀
-
