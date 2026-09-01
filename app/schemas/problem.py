@@ -14,6 +14,7 @@ class ProblemCreate(BaseModel):
     difficulty: Difficulty = Difficulty.UNKNOWN
     initial_rating: Rating
     solved_on: date = Field(default_factory=local_today)
+    duration_minutes: int | None = Field(default=None, ge=0, le=600)
     tag_ids: list[int] = []
     mistake_reason: str | None = None
     my_solution: str | None = None

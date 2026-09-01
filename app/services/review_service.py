@@ -83,7 +83,15 @@ def create_initial_review(
     *,
     review_date: date | None = None,
     reviewed_at: datetime | None = None,
+    duration_minutes: int | None = None,
 ) -> ReviewRecord:
     problem.review_stage = None  # type: ignore[assignment]
     problem.review_count = 0
-    return record_review(db, problem, rating, reviewed_at=reviewed_at, review_date=review_date)
+    return record_review(
+        db,
+        problem,
+        rating,
+        reviewed_at=reviewed_at,
+        review_date=review_date,
+        duration_minutes=duration_minutes,
+    )

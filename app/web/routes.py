@@ -91,7 +91,17 @@ async def create_problem_page(request: Request, db: Db):
         solved_on = date.fromisoformat(str(form.get("solved_on", local_today().isoformat())))
         if solved_on > local_today():
             raise ValueError
-        create_initial_review(db, problem, problem.rating, review_date=solved_on)
+        duration_text = str(form.get("duration_minutes", "")).strip()
+        duration_minutes = int(duration_text) if duration_text else None
+        if duration_minutes is not None and not 0 <= duration_minutes <= 600:
+            raise ValueError
+        create_initial_review(
+            db,
+            problem,
+            problem.rating,
+            review_date=solved_on,
+            duration_minutes=duration_minutes,
+        )
         db.commit()
         return RedirectResponse(f"/problems/{problem.id}", status_code=303)
     except (ValueError, IntegrityError):

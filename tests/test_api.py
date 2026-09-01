@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 
-def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None, solved_on=None):
+def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None, solved_on=None, duration_minutes=None):
     payload = {
         "leetcode_id": leetcode_id,
         "title": "最长连续序列",
@@ -15,6 +15,8 @@ def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None, solved_o
     }
     if solved_on is not None:
         payload["solved_on"] = solved_on
+    if duration_minutes is not None:
+        payload["duration_minutes"] = duration_minutes
     return client.post("/api/v1/problems", json=payload)
 
 
@@ -83,7 +85,7 @@ def test_review_submission_due_history_and_schedule(client):
 
 def test_create_problem_with_past_solved_date(client):
     solved_on = date.today() - timedelta(days=10)
-    response = create_problem(client, solved_on=solved_on.isoformat())
+    response = create_problem(client, solved_on=solved_on.isoformat(), duration_minutes=42)
     assert response.status_code == 201
     problem = response.json()
     assert problem["next_review_at"] == (solved_on + timedelta(days=1)).isoformat()
@@ -91,10 +93,17 @@ def test_create_problem_with_past_solved_date(client):
     history = client.get(f"/api/v1/problems/{problem['id']}/reviews").json()
     assert history[0]["reviewed_at"].startswith(solved_on.isoformat())
     assert history[0]["next_review_at"] == (solved_on + timedelta(days=1)).isoformat()
+    assert history[0]["duration_minutes"] == 42
 
 
 def test_create_problem_rejects_future_solved_date(client):
     response = create_problem(client, solved_on=(date.today() + timedelta(days=1)).isoformat())
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_create_problem_rejects_invalid_initial_duration(client):
+    response = create_problem(client, duration_minutes=601)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
@@ -159,6 +168,7 @@ def test_web_form_creates_historical_problem(client):
     solved_on = date.today() - timedelta(days=20)
     form = client.get("/problems/new")
     assert f'value="{date.today().isoformat()}"' in form.text
+    assert 'name="duration_minutes"' in form.text
     response = client.post(
         "/problems/new",
         data={
@@ -167,6 +177,7 @@ def test_web_form_creates_historical_problem(client):
             "difficulty": "MEDIUM",
             "initial_rating": "GREEN",
             "solved_on": solved_on.isoformat(),
+            "duration_minutes": "35",
             "tags": "图, DFS",
         },
         follow_redirects=False,
@@ -174,6 +185,8 @@ def test_web_form_creates_historical_problem(client):
     assert response.status_code == 303
     problem = client.get("/api/v1/problems", params={"search": "200"}).json()["items"][0]
     assert problem["next_review_at"] == (solved_on + timedelta(days=7)).isoformat()
+    history = client.get(f"/api/v1/problems/{problem['id']}/reviews").json()
+    assert history[0]["duration_minutes"] == 35
 
 
 def test_web_review_form_accepts_historical_date(client):
