@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.timezone import local_today, utc_now
+from app.core.timezone import local_date_midday_to_utc_naive, local_today, utc_now
 from app.models import Problem, ReviewRecord
 from app.models.enums import Rating, ReviewStage
 
@@ -50,7 +50,7 @@ def record_review(
         reviewed_at = (
             utc_now()
             if effective_review_date == local_today()
-            else datetime.combine(effective_review_date, time(hour=12))
+            else local_date_midday_to_utc_naive(effective_review_date)
         )
     schedule = calculate_next_review(problem.review_stage, rating, effective_review_date)
     record = ReviewRecord(

@@ -10,7 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.timezone import local_today, utc_naive_to_local_date
+from app.core.config import get_settings
+from app.core.timezone import (
+    format_local_datetime,
+    local_date_start_to_utc_naive,
+    local_today,
+    utc_naive_to_local_date,
+)
 from app.models import AppSettings, Problem, ReviewRecord, Tag
 from app.models.enums import Difficulty, Rating, ReviewStage
 from app.services.problem_service import list_problems
@@ -19,13 +25,14 @@ from app.services.statistics_service import overview
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).resolve().parents[1] / "templates")
+templates.env.filters["local_datetime"] = format_local_datetime
 Db = Annotated[Session, Depends(get_db)]
 
 
 def base_context(request: Request, db: Session, **extra):
     today = local_today()
     due_count = db.scalar(select(func.count(Problem.id)).where(Problem.is_archived.is_(False), Problem.next_review_at <= today, Problem.review_stage != ReviewStage.MASTERED)) or 0
-    return {"request": request, "due_count": due_count, "today": today, "Rating": Rating, "ReviewStage": ReviewStage, "Difficulty": Difficulty, **extra}
+    return {"request": request, "due_count": due_count, "today": today, "app_timezone": get_settings().app_timezone, "Rating": Rating, "ReviewStage": ReviewStage, "Difficulty": Difficulty, **extra}
 
 
 def split_tags(value: str) -> list[str]:
@@ -201,7 +208,8 @@ def problem_history(problem_id: int, request: Request, db: Db):
 
 @router.get("/history")
 def history_page(request: Request, db: Db, rating: str | None = None, problem_id: int | None = None, tag: str | None = None, days: int = 30):
-    stmt = select(ReviewRecord).join(Problem).where(Problem.is_archived.is_(False), ReviewRecord.reviewed_at >= datetime.combine(local_today() - timedelta(days=days), datetime.min.time()))
+    since_utc = local_date_start_to_utc_naive(local_today() - timedelta(days=days))
+    stmt = select(ReviewRecord).join(Problem).where(Problem.is_archived.is_(False), ReviewRecord.reviewed_at >= since_utc)
     if rating: stmt = stmt.where(ReviewRecord.rating == rating)
     if problem_id: stmt = stmt.where(ReviewRecord.problem_id == problem_id)
     if tag: stmt = stmt.where(Problem.tags.any(Tag.name == tag))

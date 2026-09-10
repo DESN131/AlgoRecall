@@ -1,4 +1,7 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+
+from app.core.config import get_settings
+from app.core.timezone import format_local_datetime
 
 
 def create_problem(client, leetcode_id=128, rating="RED", tag_ids=None, solved_on=None, duration_minutes=None):
@@ -162,6 +165,18 @@ def test_web_pages_smoke(client):
     for path in ["/", "/problems", "/problems/new", "/review", "/history", "/statistics", "/settings", "/docs"]:
         response = client.get(path)
         assert response.status_code == 200, path
+
+
+def test_history_page_displays_review_time_in_configured_timezone(client):
+    problem = create_problem(client).json()
+    history = client.get(f"/api/v1/problems/{problem['id']}/reviews").json()
+    reviewed_at_utc = datetime.fromisoformat(history[0]["reviewed_at"])
+    expected_local_time = format_local_datetime(reviewed_at_utc)
+
+    page = client.get(f"/problems/{problem['id']}/history")
+    assert page.status_code == 200
+    assert expected_local_time in page.text
+    assert f"时间按 {get_settings().app_timezone} 显示" in page.text
 
 
 def test_web_form_creates_historical_problem(client):
